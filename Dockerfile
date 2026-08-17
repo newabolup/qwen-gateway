@@ -43,7 +43,8 @@ COPY pyproject.toml requirements.txt ./
 
 RUN mkdir -p /app/data && chown -R gateway:gateway /app
 
-USER gateway
+# Run as root: Railway bind-mounted volumes are root-owned; the non-root
+# "gateway" user cannot write to them otherwise.
 EXPOSE 8787
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
