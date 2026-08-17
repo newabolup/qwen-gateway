@@ -1,0 +1,61 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qwen-token-gateway:latest
+    container_name: qwen-gateway
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8787}:8787"
+    environment:
+      APP_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8787
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_JSON: ${LOG_JSON:-true}
+      # REQUIRED: generate with `python -m app.cli generate-key`
+      GATEWAY_SECRET_KEY: ${GATEWAY_SECRET_KEY:?set GATEWAY_SECRET_KEY in .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      # SQLite by default; switch to the postgres service below if desired.
+      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./data/gateway.db}
+      DEFAULT_PROVIDER: ${DEFAULT_PROVIDER:-qwen}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-qwen3-max}
+      MODEL_ALIASES: ${MODEL_ALIASES:-qwen=qwen3-max,qwen-default=qwen3-max}
+      SCHEDULER_STRATEGY: ${SCHEDULER_STRATEGY:-round_robin}
+      EXPOSE_REASONING: ${EXPOSE_REASONING:-false}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
+      TRUST_FORWARDED_FOR: ${TRUST_FORWARDED_FOR:-false}
+    volumes:
+      - gateway-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8787/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Optional PostgreSQL backend.
+  # Enable with:  docker compose --profile postgres up -d
+  # and set DATABASE_URL=postgresql+asyncpg://gateway:gateway@postgres:5432/gateway
+  postgres:
+    image: postgres:16-alpine
+    container_name: qwen-gateway-db
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gateway}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gateway}
+      POSTGRES_DB: ${POSTGRES_DB:-gateway}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gateway}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  gateway-data:
+  postgres-data:

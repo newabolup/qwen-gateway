@@ -1,0 +1,60 @@
+# systemd unit for the Qwen Token Gateway (Linux / VPS).
+#
+# Install:
+#   sudo cp docker/qwen-gateway.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now qwen-gateway
+#   sudo journalctl -u qwen-gateway -f
+#
+# Assumes the repo lives at /opt/qwen-gateway with a virtualenv at .venv
+# and a populated .env file (chmod 600, owned by the service user).
+
+[Unit]
+Description=Qwen Token Gateway (OpenAI-compatible API gateway)
+Documentation=https://github.com/your-org/qwen-gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=qwen-gateway
+Group=qwen-gateway
+WorkingDirectory=/opt/qwen-gateway
+
+# Secrets come from the environment file, never from this unit.
+EnvironmentFile=/opt/qwen-gateway/.env
+Environment=APP_ENV=production
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/opt/qwen-gateway/.venv/bin/uvicorn app.main:app \
+    --host 0.0.0.0 \
+    --port ${PORT} \
+    --no-access-log
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGINT
+
+# --- Hardening ---
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# The database directory is the only writable path required.
+ReadWritePaths=/opt/qwen-gateway/data
+
+# --- Logging ---
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=qwen-gateway
+
+[Install]
+WantedBy=multi-user.target
