@@ -44,7 +44,6 @@ COPY pyproject.toml requirements.txt ./
 RUN mkdir -p /app/data && chown -R gateway:gateway /app
 
 USER gateway
-VOLUME ["/app/data"]
 EXPOSE 8787
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
